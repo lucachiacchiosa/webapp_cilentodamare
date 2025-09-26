@@ -11,11 +11,7 @@
     "jsx": "preserve",
     "strict": true,
     "baseUrl": ".",
-    "paths": {
-      "@/*": [
-        "src/*"
-      ]
-    },
+    "paths": { "@/*": ["src/*"]},
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,

@@ -6,6 +6,8 @@ import { authOptions } from "@/auth"
 export async function GET() {
   try {
     const experiences = await prisma.experience.findMany({
+      // Prendo tutti i campi di Experience (niente select "stretti"),
+      // + i soli campi che mi servono dell'operatore
       include: { operator: { select: { displayName: true, location: true } } },
       orderBy: { createdAt: "desc" },
     })
@@ -32,12 +34,11 @@ export async function POST(req: Request) {
     const {
       operatorId: operatorIdFromBody,
       title,
-      slug,
       description,
       category,
-      location,
+      // location,      // ⛔ disattivato: invialo solo se ESISTE nello schema
       priceCents,
-      durationMin,
+      // durationMin,   // ⛔ disattivato: invialo solo se ESISTE nello schema
       minGuests,
       maxGuests,
       images,
@@ -55,7 +56,6 @@ export async function POST(req: Request) {
       if (!operatorId) {
         return NextResponse.json({ ok: false, error: "Operator profile not found for this user" }, { status: 403 })
       }
-      // Se l'OPERATOR prova a specificare un operatorId diverso → blocca
       if (operatorIdFromBody && operatorIdFromBody !== operatorId) {
         return NextResponse.json({ ok: false, error: "Forbidden: cannot assign to another operator" }, { status: 403 })
       }
@@ -69,22 +69,41 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "operatorId is required (ADMIN)" }, { status: 400 })
     }
 
-    const created = await prisma.experience.create({
-      data: {
-        operatorId,
-        title: String(title),
-        slug: (slug ? String(slug) : String(title)).toLowerCase().trim().replace(/\s+/g, "-"),
-        description: String(description),
-        category: String(category) as any,
-        location: location ? String(location) : "Cilento",
-        priceCents: Number(priceCents),
-        durationMin: durationMin == null ? null : Number(durationMin),
-        minGuests: minGuests == null ? null : Number(minGuests),
-        maxGuests: maxGuests == null ? null : Number(maxGuests),
-        images: Array.isArray(images) ? images.map(String) : [],
-        active: Boolean(active ?? true),
-      },
-    })
+    // Fallback robusti per gli interi
+    const minGuestsVal =
+      Number.isFinite(Number(minGuests)) && Number(minGuests) > 0
+        ? Number(minGuests)
+        : 1
+
+    const maxGuestsRaw =
+      Number.isFinite(Number(maxGuests)) && Number(maxGuests) > 0
+        ? Number(maxGuests)
+        : 10
+
+    const maxGuestsVal = Math.max(minGuestsVal, maxGuestsRaw) // garantisce max >= min
+
+    // Costruisco i dati in modo incrementale per evitare errori di campi inesistenti
+    const data: any = {
+      operatorId,
+      title: String(title),
+      description: String(description),
+      category: String(category) as any, // se hai l'enum Prisma: Prisma.$Enums.Category
+      priceCents: Number(priceCents),
+      minGuests: minGuestsVal,
+      maxGuests: maxGuestsVal,
+      active: Boolean(active ?? true),
+    }
+
+    // Se il tuo schema ha images: String[] @default([]), tieni questo blocco
+    if (Array.isArray(images)) {
+      data.images = images.map(String)
+    }
+
+    // Se in futuro AGGIUNGI questi campi allo schema, puoi sbloccarli:
+    // if (location) data.location = String(location)
+    // if (durationMin != null) data.durationMin = Number(durationMin)
+
+    const created = await prisma.experience.create({ data })
 
     return NextResponse.json({ ok: true, experience: created })
   } catch (e) {

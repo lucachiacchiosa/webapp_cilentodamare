@@ -39,7 +39,12 @@ export default function Navbar() {
               >
                 Experiences
               </Link>
-              {/* Qui in futuro: Operatori, Prenotazioni, ecc. */}
+              <Link
+                href="/dashboard/admin/deletion-requests"
+                className="rounded px-3 py-2 text-sm hover:bg-gray-100"
+              >
+                Richieste di cancellazione
+              </Link>
             </>
           )}
 

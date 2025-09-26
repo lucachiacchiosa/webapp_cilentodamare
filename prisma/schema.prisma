@@ -8,102 +8,70 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-//
-// ENUMS
-//
-enum Role {
-  ADMIN
-  OPERATOR
-  CUSTOMER
-}
-
-enum Tier {
-  BASIC
-  SILVER
-  GOLD
-  PLATINUM
-}
-
-enum Category {
-  GASTRONOMIA
-  MARE
-  TREKKING
-  CULTURA
-  SPORT
-  WELLNESS
-}
-
-enum BookingStatus {
-  PENDING
-  PAID
-  CANCELED
-}
-
-//
-// MODELS
-//
 model User {
-  id        String     @id @default(cuid())
-  email     String     @unique
+  id        String    @id @default(cuid())
+  email     String    @unique
   password  String?
   name      String?
-  role      Role       @default(CUSTOMER)
+  role      Role      @default(CUSTOMER)
+  createdAt DateTime  @default(now())
+  accounts  Account[]
   bookings  Booking[]
   operator  Operator?
-  createdAt DateTime   @default(now())
-
-  // next-auth relations
-  accounts  Account[]
   sessions  Session[]
 }
 
 model Operator {
   id          String       @id @default(cuid())
   userId      String       @unique
-  user        User         @relation(fields: [userId], references: [id])
   displayName String
   description String?
-  location    String?
+  location    String
   tier        Tier         @default(BASIC)
-  experiences Experience[]
   createdAt   DateTime     @default(now())
+  experiences Experience[]
+  user        User         @relation(fields: [userId], references: [id])
 }
 
 model Experience {
-  id          String      @id @default(cuid())
-  operatorId  String
-  operator    Operator    @relation(fields: [operatorId], references: [id])
-  title       String
-  slug        String      @unique
-  description String
-  category    Category
-  location    String
-  priceCents  Int
-  durationMin Int?
-  minGuests   Int?
-  maxGuests   Int?
-  images      String[]
-  active      Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  bookings    Booking[]
+  id              String            @id @default(cuid())
+  operatorId      String
+  title           String
+  slug            String            @unique
+  description     String
+  category        Category
+  location        String
+  priceCents      Int
+  durationMin     Int?
+  minGuests       Int               @default(1)
+  maxGuests       Int?
+  cancelPolicy    String?
+  requirements    String?
+  status          ExperienceStatus  @default(ACTIVE)
+  accessibility   String?
+  images          String[]
+  active          Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @default(now()) @updatedAt
+  Booking         Booking[]
+  operator        Operator          @relation(fields: [operatorId], references: [id])
+  DeletionRequest DeletionRequest[]
 }
 
 model Booking {
-  id           String        @id @default(cuid())
-  userId       String
-  user         User          @relation(fields: [userId], references: [id])
-  experienceId String
-  experience   Experience    @relation(fields: [experienceId], references: [id])
-  status       BookingStatus @default(PENDING)
-  date         DateTime
-  guests       Int
-  totalCents   Int
-  createdAt    DateTime      @default(now())
+  id            String        @id @default(cuid())
+  experienceId  String
+  userId        String
+  date          DateTime
+  guests        Int
+  amountCents   Int
+  status        BookingStatus @default(PENDING)
+  stripeSession String?
+  createdAt     DateTime      @default(now())
+  experience    Experience    @relation(fields: [experienceId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
 }
 
-//
-// NEXT-AUTH MODELS
-//
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -135,5 +103,65 @@ model VerificationToken {
   token      String   @unique
   expires    DateTime
 
-  @@id([identifier, token])
+  @@unique([identifier, token])
+}
+
+model Attraction {
+  id          String   @id
+  name        String
+  slug        String   @unique
+  location    String
+  description String
+  images      String[]
+  createdAt   DateTime @default(now())
+}
+
+model DeletionRequest {
+  id                String                @id @default(cuid())
+  experienceId      String
+  experience        Experience            @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  reason            String?
+  status            DeletionRequestStatus @default(PENDING)
+  requestedByUserId String?
+  decidedAt         DateTime?
+  createdAt         DateTime              @default(now())
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+  CUSTOMER
+}
+
+enum Tier {
+  BASIC
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum Category {
+  GASTRONOMIA
+  MARE
+  TREKKING
+  CULTURA
+  SPORT
+  WELLNESS
+}
+
+enum BookingStatus {
+  PENDING
+  PAID
+  CANCELED
+}
+
+enum ExperienceStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum DeletionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
